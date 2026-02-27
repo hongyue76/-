@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 setlocal
 
 echo [INFO] 启动待办事项应用...
@@ -7,6 +8,16 @@ REM 检查Docker是否安装
 docker --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo ❌ 请先安装Docker Desktop
+    echo 下载地址: https://www.docker.com/products/docker-desktop
+    pause
+    exit /b 1
+)
+
+REM 检查Docker服务是否运行
+docker info >nul 2>&1
+if %errorlevel% neq 0 (
+    echo ❌ Docker服务未运行，请先启动Docker Desktop
+    echo 请在开始菜单中搜索并启动 "Docker Desktop"
     pause
     exit /b 1
 )
@@ -27,7 +38,7 @@ echo [START] 启动所有服务...
 docker-compose up -d
 
 echo [WAIT] 等待服务启动...
-timeout /t 10 /nobreak >nul
+timeout /t 15 /nobreak >nul
 
 REM 检查服务状态
 echo [STATUS] 服务状态:
