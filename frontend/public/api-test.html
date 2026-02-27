@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API测试工具</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin: 25px 0;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        .section-title {
+            color: #1890ff;
+            margin-top: 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #1890ff;
+        }
+        .endpoint {
+            background: #f9f9f9;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #1890ff;
+        }
+        .method {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+        }
+        .get { background-color: #61affe; }
+        .post { background-color: #49cc90; }
+        .put { background-color: #fca130; }
+        .delete { background-color: #f93e3e; }
+        input, button, select, textarea {
+            padding: 10px;
+            margin: 5px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background: #1890ff;
+            color: white;
+            cursor: pointer;
+            border: none;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #40a9ff;
+        }
+        .response {
+            background: #000;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .auth-section {
+            background: #e6f7ff;
+            border-color: #91d5ff;
+        }
+        .test-btn {
+            background: #52c41a;
+        }
+        .test-btn:hover {
+            background: #73d13d;
+        }
+        .error {
+            color: #ff4d4f;
+            background: #fff2f0;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #ffccc7;
+        }
+        .success {
+            color: #52c41a;
+            background: #f6ffed;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #b7eb8f;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 待办事项API测试工具</h1>
+        <p>本地API文档替代方案，无需外部CDN依赖</p>
+
+        <!-- 认证区域 -->
+        <div class="section auth-section">
+            <h2 class="section-title">🔒 用户认证</h2>
+            <div>
+                <input type="text" id="username" placeholder="用户名" value="admin">
+                <input type="password" id="password" placeholder="密码" value="admin123">
+                <button onclick="login()">登录获取Token</button>
+                <button onclick="register()">注册新用户</button>
+            </div>
+            <div style="margin-top: 15px;">
+                <strong>当前Token:</strong> <span id="currentToken">未登录</span>
+            </div>
+        </div>
+
+        <!-- 用户相关API -->
+        <div class="section">
+            <h2 class="section-title">👤 用户管理</h2>
+            
+            <div class="endpoint">
+                <span class="method get">GET</span>
+                <strong>/api/users/me</strong> - 获取当前用户信息
+                <br><button class="test-btn" onclick="getCurrentUser()">测试</button>
+            </div>
+            
+            <div class="endpoint">
+                <span class="method put">PUT</span>
+                <strong>/api/users/me</strong> - 更新用户信息
+                <br>
+                <textarea id="updateUserData" placeholder='{"email": "new@example.com", "full_name": "新姓名"}' rows="3" cols="50"></textarea>
+                <br><button class="test-btn" onclick="updateUser()">测试</button>
+            </div>
+        </div>
+
+        <!-- 待办事项API -->
+        <div class="section">
+            <h2 class="section-title">📋 待办事项</h2>
+            
+            <div class="endpoint">
+                <span class="method get">GET</span>
+                <strong>/api/todos/</strong> - 获取待办事项列表
+                <br>
+                <input type="text" id="todoSkip" placeholder="skip (默认0)" value="0">
+                <input type="text" id="todoLimit" placeholder="limit (默认100)" value="100">
+                <button class="test-btn" onclick="getTodos()">测试</button>
+            </div>
+            
+            <div class="endpoint">
+                <span class="method post">POST</span>
+                <strong>/api/todos/</strong> - 创建待办事项
+                <br>
+                <textarea id="createTodoData" placeholder='{"title": "测试任务", "description": "这是一个测试任务", "priority": "high"}' rows="4" cols="50"></textarea>
+                <br><button class="test-btn" onclick="createTodo()">测试</button>
+            </div>
+            
+            <div class="endpoint">
+                <span class="method get">GET</span>
+                <strong>/api/todos/{id}</strong> - 获取特定待办事项
+                <br>
+                <input type="text" id="getTodoId" placeholder="待办事项ID">
+                <button class="test-btn" onclick="getTodoById()">测试</button>
+            </div>
+            
+            <div class="endpoint">
+                <span class="method put">PUT</span>
+                <strong>/api/todos/{id}</strong> - 更新待办事项
+                <br>
+                <input type="text" id="updateTodoId" placeholder="待办事项ID">
+                <textarea id="updateTodoData" placeholder='{"title": "更新后的标题", "completed": true}' rows="3" cols="50"></textarea>
+                <br><button class="test-btn" onclick="updateTodo()">测试</button>
+            </div>
+            
+            <div class="endpoint">
+                <span class="method delete">DELETE</span>
+                <strong>/api/todos/{id}</strong> - 删除待办事项
+                <br>
+                <input type="text" id="deleteTodoId" placeholder="待办事项ID">
+                <button class="test-btn" onclick="deleteTodo()">测试</button>
+            </div>
+        </div>
+
+        <!-- 实时同步API -->
+        <div class="section">
+            <h2 class="section-title">⚡ 实时同步</h2>
+            
+            <div class="endpoint">
+                <span class="method get">GET</span>
+                <strong>/api/ws/stats</strong> - 获取WebSocket连接统计
+                <br><button class="test-btn" onclick="getWsStats()">测试</button>
+            </div>
+            
+            <div class="endpoint">
+                <span class="method post">POST</span>
+                <strong>/api/ws/broadcast</strong> - 广播消息
+                <br>
+                <textarea id="broadcastData" placeholder='{"type": "test", "message": "测试广播消息"}' rows="3" cols="50"></textarea>
+                <br><button class="test-btn" onclick="broadcastMessage()">测试</button>
+            </div>
+        </div>
+
+        <!-- 响应结果显示 -->
+        <div class="section">
+            <h2 class="section-title">📊 API响应结果</h2>
+            <div id="responseArea" class="response">点击测试按钮查看API响应...</div>
+            <button onclick="clearResponse()">清空结果</button>
+        </div>
+    </div>
+
+    <script>
+        let authToken = '';
+
+        // 显示响应结果
+        function showResponse(data, isError = false) {
+            const responseArea = document.getElementById('responseArea');
+            const className = isError ? 'error' : 'success';
+            responseArea.innerHTML = `<div class="${className}">${JSON.stringify(data, null, 2)}</div>`;
+        }
+
+        // 清空响应
+        function clearResponse() {
+            document.getElementById('responseArea').innerHTML = '点击测试按钮查看API响应...';
+        }
+
+        // 通用API调用函数
+        async function callApi(url, method = 'GET', data = null) {
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            
+            if (authToken) {
+                headers['Authorization'] = `Bearer ${authToken}`;
+            }
+            
+            const options = {
+                method: method,
+                headers: headers
+            };
+            
+            if (data) {
+                options.body = JSON.stringify(data);
+            }
+            
+            try {
+                const response = await fetch(`http://localhost:8001${url}`, options);
+                
+                // 处理不同类型的响应
+                let result;
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    result = await response.json();
+                } else {
+                    result = await response.text();
+                }
+                
+                if (response.ok) {
+                    showResponse({status: response.status, data: result});
+                    return result;
+                } else {
+                    showResponse({error: response.status, message: result.detail || result || '请求失败'}, true);
+                    return null;
+                }
+            } catch (error) {
+                showResponse({error: '网络错误', message: error.message}, true);
+                return null;
+            }
+        }
+
+        // 登录
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            const result = await callApi('/api/auth/login', 'POST', {
+                username: username,
+                password: password
+            });
+            
+            if (result && result.access_token) {
+                authToken = result.access_token;
+                document.getElementById('currentToken').textContent = authToken.substring(0, 30) + '...';
+                showResponse({message: '登录成功', token: authToken.substring(0, 20) + '...'});
+            }
+        }
+
+        // 注册
+        async function register() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            const result = await callApi('/api/auth/register', 'POST', {
+                username: username,
+                password: password,
+                email: `${username}@example.com`,
+                full_name: username
+            });
+            
+            if (result) {
+                showResponse({message: '注册成功，请登录'});
+            }
+        }
+
+        // 获取当前用户
+        async function getCurrentUser() {
+            await callApi('/api/users/me');
+        }
+
+        // 更新用户
+        async function updateUser() {
+            const userData = JSON.parse(document.getElementById('updateUserData').value);
+            await callApi('/api/users/me', 'PUT', userData);
+        }
+
+        // 获取待办事项列表
+        async function getTodos() {
+            const skip = document.getElementById('todoSkip').value || 0;
+            const limit = document.getElementById('todoLimit').value || 100;
+            await callApi(`/api/todos/?skip=${skip}&limit=${limit}`);
+        }
+
+        // 创建待办事项
+        async function createTodo() {
+            const todoData = JSON.parse(document.getElementById('createTodoData').value);
+            await callApi('/api/todos/', 'POST', todoData);
+        }
+
+        // 获取特定待办事项
+        async function getTodoById() {
+            const id = document.getElementById('getTodoId').value;
+            if (!id) {
+                showResponse({error: '请输入待办事项ID'}, true);
+                return;
+            }
+            await callApi(`/api/todos/${id}`);
+        }
+
+        // 更新待办事项
+        async function updateTodo() {
+            const id = document.getElementById('updateTodoId').value;
+            const todoData = JSON.parse(document.getElementById('updateTodoData').value);
+            if (!id) {
+                showResponse({error: '请输入待办事项ID'}, true);
+                return;
+            }
+            await callApi(`/api/todos/${id}`, 'PUT', todoData);
+        }
+
+        // 删除待办事项
+        async function deleteTodo() {
+            const id = document.getElementById('deleteTodoId').value;
+            if (!id) {
+                showResponse({error: '请输入待办事项ID'}, true);
+                return;
+            }
+            await callApi(`/api/todos/${id}`, 'DELETE');
+        }
+
+        // 获取WebSocket统计
+        async function getWsStats() {
+            await callApi('/api/ws/stats');
+        }
+
+        // 广播消息
+        async function broadcastMessage() {
+            const broadcastData = JSON.parse(document.getElementById('broadcastData').value);
+            await callApi('/api/ws/broadcast', 'POST', broadcastData);
+        }
+
+        // 页面加载提示
+        document.addEventListener('DOMContentLoaded', function() {
+            showResponse({message: 'API测试工具已就绪，请先登录'});
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>待办事项API文档</title>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+        #swagger-ui {
+            margin: 20px;
+        }
+        .header {
+            background: #409eff;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📝 待办事项应用API文档</h1>
+        <p>多用户同步待办事项管理系统</p>
+    </div>
+    
+    <div id="swagger-ui"></div>
+    
+    <script>
+        // 简化的API文档展示
+        document.addEventListener('DOMContentLoaded', function() {
+            const swaggerContainer = document.getElementById('swagger-ui');
+            
+            // 从FastAPI获取OpenAPI规范
+            fetch('/openapi.json')
+                .then(response => response.json())
+                .then(spec => {
+                    // 创建简化版的API文档展示
+                    renderApiDocs(swaggerContainer, spec);
+                })
+                .catch(error => {
+                    console.error('获取API文档失败:', error);
+                    swaggerContainer.innerHTML = `
+                        <div style="padding: 20px; text-align: center; color: #666;">
+                            <h2>❌ API文档加载失败</h2>
+                            <p>请确保后端服务正在运行</p>
+                            <button onclick="location.reload()" style="padding: 10px 20px; background: #409eff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                重新加载
+                            </button>
+                        </div>
+                    `;
+                });
+        });
+        
+        function renderApiDocs(container, spec) {
+            let html = `
+                <div style="max-width: 1200px; margin: 0 auto; padding: 20px;">
+                    <div style="background: white; border-radius: 8px; box-shadow: 0 2px 12px 0 rgba(0,0,0,.1); padding: 30px;">
+                        <h1 style="color: #333; margin-bottom: 30px;">${spec.info.title}</h1>
+                        <p style="color: #666; margin-bottom: 30px;">${spec.info.description}</p>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+            `;
+            
+            // 按标签分组显示API端点
+            const pathsByTag = {};
+            Object.entries(spec.paths).forEach(([path, methods]) => {
+                Object.entries(methods).forEach(([method, details]) => {
+                    const tag = details.tags?.[0] || '未分类';
+                    if (!pathsByTag[tag]) {
+                        pathsByTag[tag] = [];
+                    }
+                    pathsByTag[tag].push({ path, method, details });
+                });
+            });
+            
+            // 渲染每个标签组
+            Object.entries(pathsByTag).forEach(([tag, endpoints]) => {
+                html += `
+                    <div style="border: 1px solid #ebeef5; border-radius: 6px; overflow: hidden;">
+                        <div style="background: #f5f7fa; padding: 15px; border-bottom: 1px solid #ebeef5;">
+                            <h3 style="margin: 0; color: #333;">${tag}</h3>
+                        </div>
+                        <div style="padding: 15px;">
+                `;
+                
+                endpoints.forEach(({ path, method, details }) => {
+                    const methodColor = getMethodColor(method);
+                    html += `
+                        <div style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #eee;">
+                            <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                                <span style="background: ${methodColor}; color: white; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold; text-transform: uppercase; margin-right: 10px;">
+                                    ${method}
+                                </span>
+                                <code style="background: #f8f9fa; padding: 4px 8px; border-radius: 4px; font-family: monospace;">
+                                    ${path}
+                                </code>
+                            </div>
+                            <p style="margin: 10px 0; color: #666;">${details.summary || details.description || ''}</p>
+                            
+                            ${details.parameters ? `
+                                <div style="margin-top: 10px;">
+                                    <strong>参数:</strong>
+                                    <ul style="margin: 5px 0; padding-left: 20px;">
+                                        ${details.parameters.map(param => 
+                                            `<li><code>${param.name}</code> (${param.in}) - ${param.description || ''}</li>`
+                                        ).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
+                            
+                            ${details.requestBody ? `
+                                <div style="margin-top: 10px;">
+                                    <strong>请求体:</strong>
+                                    <pre style="background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 12px; overflow-x: auto;">${JSON.stringify(details.requestBody, null, 2)}</pre>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+                
+                html += `
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += `
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            container.innerHTML = html;
+        }
+        
+        function getMethodColor(method) {
+            const colors = {
+                'get': '#61affe',
+                'post': '#49cc90',
+                'put': '#fca130',
+                'delete': '#f93e3e',
+                'patch': '#50e3c2'
+            };
+            return colors[method.toLowerCase()] || '#61affe';
+        }
+    </script>
+</body>
+</html>

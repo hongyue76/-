@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试页面</title>
+</head>
+<body>
+    <div id="test">
+        <h1>前端测试页面</h1>
+        <p>如果能看到这个页面，说明前端基础服务正常</p>
+        <button onclick="testApi()">测试API连接</button>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function testApi() {
+            try {
+                const response = await fetch('/api/');
+                const data = await response.json();
+                document.getElementById('result').innerHTML = 
+                    '<p style="color: green;">API连接成功: ' + JSON.stringify(data) + '</p>';
+            } catch (error) {
+                document.getElementById('result').innerHTML = 
+                    '<p style="color: red;">API连接失败: ' + error.message + '</p>';
+            }
+        }
+    </script>
+</body>
+</html>

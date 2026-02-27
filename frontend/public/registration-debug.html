@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>注册功能验证</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { background-color: #f6ffed; border-color: #b7eb8f; }
+        .error { background-color: #fff2f0; border-color: #ffccc7; }
+        .info { background-color: #e6f7ff; border-color: #91d5ff; }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background: #1890ff;
+            color: white;
+        }
+        button:hover { background: #40a9ff; }
+        .result { 
+            margin: 10px 0; 
+            padding: 10px; 
+            border-radius: 4px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 注册功能验证测试</h1>
+        
+        <div class="test-section info">
+            <h3>测试目标</h3>
+            <p>验证前端注册功能是否能正确连接到后端API</p>
+        </div>
+        
+        <div class="test-section">
+            <h3>1. 直接API测试</h3>
+            <button onclick="testDirectApi()">测试后端API直连</button>
+            <div id="directApiResult" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>2. 前端代理测试</h3>
+            <button onclick="testProxyApi()">测试前端代理</button>
+            <div id="proxyApiResult" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>3. 完整注册流程测试</h3>
+            <button onclick="testFullRegistration()">测试完整注册</button>
+            <div id="registrationResult" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>4. 网络连接检查</h3>
+            <button onclick="checkNetwork()">检查网络连接</button>
+            <div id="networkResult" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="${type}">${message}</div>`;
+        }
+
+        async function testDirectApi() {
+            showResult('directApiResult', '正在测试后端API直连...', 'info');
+            
+            try {
+                const response = await fetch('http://localhost:8001/api/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: 'apitest' + Date.now(),
+                        email: 'api' + Date.now() + '@test.com',
+                        password: 'testpass123'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('directApiResult', `✅ 后端API直连成功<br>响应: ${JSON.stringify(data)}`, 'success');
+                } else {
+                    showResult('directApiResult', `❌ 后端API直连失败<br>状态: ${response.status}<br>错误: ${JSON.stringify(data)}`, 'error');
+                }
+            } catch (error) {
+                showResult('directApiResult', `❌ 后端API连接错误<br>错误信息: ${error.message}`, 'error');
+            }
+        }
+
+        async function testProxyApi() {
+            showResult('proxyApiResult', '正在测试前端代理...', 'info');
+            
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: 'proxytest' + Date.now(),
+                        email: 'proxy' + Date.now() + '@test.com',
+                        password: 'testpass123'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('proxyApiResult', `✅ 前端代理成功<br>响应: ${JSON.stringify(data)}`, 'success');
+                } else {
+                    showResult('proxyApiResult', `❌ 前端代理失败<br>状态: ${response.status}<br>错误: ${JSON.stringify(data)}`, 'error');
+                }
+            } catch (error) {
+                showResult('proxyApiResult', `❌ 前端代理连接错误<br>错误信息: ${error.message}`, 'error');
+            }
+        }
+
+        async function testFullRegistration() {
+            showResult('registrationResult', '正在测试完整注册流程...', 'info');
+            
+            // 模拟前端注册表单提交
+            const formData = {
+                username: 'fulltest' + Date.now(),
+                email: 'full' + Date.now() + '@test.com',
+                password: 'testpass123',
+                confirmPassword: 'testpass123'
+            };
+            
+            try {
+                // 验证密码确认
+                if (formData.password !== formData.confirmPassword) {
+                    throw new Error('密码确认不匹配');
+                }
+                
+                // 发送注册请求
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: formData.username,
+                        email: formData.email,
+                        password: formData.password
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('registrationResult', `✅ 完整注册流程成功<br>用户: ${data.username}<br>邮箱: ${data.email}`, 'success');
+                } else {
+                    showResult('registrationResult', `❌ 注册失败<br>状态: ${response.status}<br>错误: ${JSON.stringify(data)}`, 'error');
+                }
+            } catch (error) {
+                showResult('registrationResult', `❌ 注册流程错误<br>错误信息: ${error.message}`, 'error');
+            }
+        }
+
+        function checkNetwork() {
+            showResult('networkResult', '正在检查网络连接...', 'info');
+            
+            const results = [];
+            
+            // 检查网络状态
+            results.push(`网络在线状态: ${navigator.onLine ? '在线' : '离线'}`);
+            
+            // 检查当前域名
+            results.push(`当前域名: ${window.location.origin}`);
+            
+            // 检查API端点
+            results.push(`API代理端点: ${window.location.origin}/api/*`);
+            
+            // 检查后端服务
+            fetch('http://localhost:8001/health')
+                .then(response => {
+                    results.push(`后端健康检查: ${response.ok ? '正常' : '异常'}`);
+                    showResult('networkResult', results.join('<br>'), 'info');
+                })
+                .catch(error => {
+                    results.push(`后端健康检查: 无法连接 (${error.message})`);
+                    showResult('networkResult', results.join('<br>'), 'info');
+                });
+        }
+
+        // 页面加载时自动运行基本检查
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(checkNetwork, 1000);
+        });
+    </script>
+</body>
+</html>

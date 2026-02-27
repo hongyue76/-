@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>离线指示器测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .status-display {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+            background: #f0f0f0;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ffcdd2;
+        }
+        .success {
+            background: #e8f5e8;
+            color: #2e7d32;
+            border: 1px solid #c8e6c9;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background: #1976d2;
+            color: white;
+        }
+        button:hover {
+            background: #1565c0;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>📡 离线指示器测试</h1>
+        
+        <div class="status-display" id="statusDisplay">
+            <h3>状态检查中...</h3>
+        </div>
+        
+        <div>
+            <button onclick="testNetworkProperties()">测试网络属性</button>
+            <button onclick="simulateOffline()">模拟离线</button>
+            <button onclick="simulateOnline()">模拟在线</button>
+            <button onclick="checkServerReachable()">检查服务器连接</button>
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <h3>测试结果:</h3>
+            <div id="testResults"></div>
+        </div>
+    </div>
+
+    <script>
+        // 模拟Vue的响应式系统
+        function createReactive(obj) {
+            return new Proxy(obj, {
+                get(target, prop) {
+                    return target[prop];
+                },
+                set(target, prop, value) {
+                    target[prop] = value;
+                    updateDisplay();
+                    return true;
+                }
+            });
+        }
+
+        // 网络状态对象
+        const networkStatus = createReactive({
+            online: navigator.onLine,
+            type: 'unknown',
+            downlink: 0,
+            rtt: 0,
+            saveData: false,
+            serverReachable: true
+        });
+
+        const isOnline = createReactive({ value: navigator.onLine });
+
+        // 更新显示
+        function updateDisplay() {
+            const display = document.getElementById('statusDisplay');
+            const results = document.getElementById('testResults');
+            
+            display.innerHTML = `
+                <h3>当前网络状态</h3>
+                <p><strong>在线状态:</strong> ${isOnline.value ? '🟢 在线' : '🔴 离线'}</p>
+                <p><strong>服务器可达:</strong> ${(networkStatus.serverReachable ?? '未定义') ? '🟢 正常' : '🔴 异常'}</p>
+                <p><strong>连接类型:</strong> ${networkStatus.type}</p>
+                <p><strong>下行速度:</strong> ${networkStatus.downlink} Mbps</p>
+                <p><strong>延迟:</strong> ${networkStatus.rtt} ms</p>
+            `;
+            
+            // 检查是否有错误
+            const hasError = !isOnline.value || !(networkStatus.serverReachable ?? true);
+            display.className = `status-display ${hasError ? 'error' : 'success'}`;
+        }
+
+        // 测试网络属性访问
+        function testNetworkProperties() {
+            const results = document.getElementById('testResults');
+            let testResults = '<h4>属性访问测试:</h4>';
+            
+            try {
+                // 测试安全访问
+                const serverReachableSafe = networkStatus.serverReachable ?? true;
+                testResults += `<p>✅ 安全访问 serverReachable: ${serverReachableSafe}</p>`;
+                
+                // 测试直接访问
+                const serverReachableDirect = networkStatus.serverReachable;
+                testResults += `<p>✅ 直接访问 serverReachable: ${serverReachableDirect}</p>`;
+                
+                // 测试计算属性
+                const isFullyOnline = isOnline.value && (networkStatus.serverReachable ?? true);
+                testResults += `<p>✅ 完全在线状态: ${isFullyOnline}</p>`;
+                
+                results.innerHTML = testResults;
+                
+            } catch (error) {
+                testResults += `<p class="error">❌ 测试失败: ${error.message}</p>`;
+                results.innerHTML = testResults;
+            }
+        }
+
+        // 模拟离线
+        function simulateOffline() {
+            isOnline.value = false;
+            networkStatus.online = false;
+            addTestResult('模拟离线状态');
+        }
+
+        // 模拟在线
+        function simulateOnline() {
+            isOnline.value = true;
+            networkStatus.online = true;
+            addTestResult('模拟在线状态');
+        }
+
+        // 检查服务器连接
+        async function checkServerReachable() {
+            try {
+                const response = await fetch('http://localhost:8001/health', { 
+                    method: 'GET',
+                    timeout: 5000
+                });
+                
+                networkStatus.serverReachable = response.ok;
+                addTestResult(`服务器连接检查: ${response.ok ? '成功' : '失败'} (${response.status})`);
+            } catch (error) {
+                networkStatus.serverReachable = false;
+                addTestResult(`服务器连接检查: 失败 (${error.message})`);
+            }
+        }
+
+        // 添加测试结果
+        function addTestResult(message) {
+            const results = document.getElementById('testResults');
+            const timestamp = new Date().toLocaleTimeString();
+            results.innerHTML += `<p>[${timestamp}] ${message}</p>`;
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            updateDisplay();
+            addTestResult('页面初始化完成');
+            
+            // 监听真实的网络状态变化
+            window.addEventListener('online', () => {
+                isOnline.value = true;
+                networkStatus.online = true;
+                addTestResult('检测到网络连接恢复');
+            });
+            
+            window.addEventListener('offline', () => {
+                isOnline.value = false;
+                networkStatus.online = false;
+                addTestResult('检测到网络连接断开');
+            });
+        });
+    </script>
+</body>
+</html>

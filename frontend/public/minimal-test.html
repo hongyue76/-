@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>最小化离线指示器测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        .status-indicator {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .online {
+            background: #e8f5e8;
+            color: #2e7d32;
+            border: 1px solid #c8e6c9;
+        }
+        .offline {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ffcdd2;
+        }
+        .partial {
+            background: #fff8e1;
+            color: #f57c00;
+            border: 1px solid #ffecb3;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background: #1976d2;
+            color: white;
+        }
+        button:hover {
+            background: #1565c0;
+        }
+        .debug-info {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>📡 简化离线指示器测试</h1>
+        
+        <div id="statusIndicator" class="status-indicator">
+            初始化中...
+        </div>
+        
+        <div class="debug-info" id="debugInfo">
+            调试信息加载中...
+        </div>
+        
+        <div>
+            <button onclick="toggleNetwork()">切换网络状态</button>
+            <button onclick="toggleServer()">切换服务器状态</button>
+            <button onclick="refreshStatus()">刷新状态</button>
+        </div>
+    </div>
+
+    <script>
+        // 模拟Vue响应式系统的核心部分
+        function createReactive(obj) {
+            return new Proxy(obj, {
+                get(target, prop) {
+                    return target[prop];
+                },
+                set(target, prop, value) {
+                    target[prop] = value;
+                    updateStatus();
+                    return true;
+                }
+            });
+        }
+
+        // 模拟网络状态
+        const mockNetworkStatus = createReactive({
+            online: navigator.onLine,
+            serverReachable: true,
+            type: 'unknown'
+        });
+
+        const mockIsOnline = createReactive({ value: navigator.onLine });
+        let currentNetworkState = 'online';
+
+        // 安全获取网络属性的函数（模拟修复后的逻辑）
+        function getNetworkProperty(property, defaultValue = null) {
+            if (!mockNetworkStatus) return defaultValue;
+            return mockNetworkStatus[property] ?? defaultValue;
+        }
+
+        // 计算指示器类（模拟Vue计算属性）
+        function getIndicatorClasses() {
+            return {
+                'online': mockIsOnline.value && getNetworkProperty('serverReachable', true),
+                'offline': !mockIsOnline.value,
+                'partial': mockIsOnline.value && !getNetworkProperty('serverReachable', true)
+            };
+        }
+
+        // 更新状态显示
+        function updateStatus() {
+            const indicator = document.getElementById('statusIndicator');
+            const debugInfo = document.getElementById('debugInfo');
+            const classes = getIndicatorClasses();
+            
+            // 清除现有类
+            indicator.className = 'status-indicator';
+            
+            // 应用新类
+            if (classes.online) {
+                indicator.classList.add('online');
+                indicator.textContent = '🟢 完全在线';
+                currentNetworkState = 'online';
+            } else if (classes.partial) {
+                indicator.classList.add('partial');
+                indicator.textContent = '🟡 部分连接';
+                currentNetworkState = 'partial';
+            } else {
+                indicator.classList.add('offline');
+                indicator.textContent = '🔴 离线状态';
+                currentNetworkState = 'offline';
+            }
+            
+            // 更新调试信息
+            debugInfo.innerHTML = `
+                <strong>调试信息:</strong><br>
+                isOnline.value: ${mockIsOnline.value}<br>
+                networkStatus.serverReachable: ${getNetworkProperty('serverReachable', 'undefined')}<br>
+                networkStatus.online: ${getNetworkProperty('online', 'undefined')}<br>
+                计算结果 - online: ${classes.online}, partial: ${classes.partial}, offline: ${classes.offline}<br>
+                当前状态: ${currentNetworkState}
+            `;
+        }
+
+        // 切换网络状态
+        function toggleNetwork() {
+            mockIsOnline.value = !mockIsOnline.value;
+            mockNetworkStatus.online = mockIsOnline.value;
+            console.log('切换网络状态到:', mockIsOnline.value);
+        }
+
+        // 切换服务器状态
+        function toggleServer() {
+            mockNetworkStatus.serverReachable = !mockNetworkStatus.serverReachable;
+            console.log('切换服务器状态到:', mockNetworkStatus.serverReachable);
+        }
+
+        // 刷新状态
+        function refreshStatus() {
+            updateStatus();
+            console.log('手动刷新状态');
+        }
+
+        // 页面加载完成
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('页面初始化完成');
+            updateStatus();
+            
+            // 监听真实网络变化
+            window.addEventListener('online', function() {
+                console.log('检测到网络连接');
+                mockIsOnline.value = true;
+                mockNetworkStatus.online = true;
+            });
+            
+            window.addEventListener('offline', function() {
+                console.log('检测到网络断开');
+                mockIsOnline.value = false;
+                mockNetworkStatus.online = false;
+            });
+        });
+
+        // 模拟可能出现的错误情况
+        function simulateErrorScenario() {
+            console.log('模拟错误场景...');
+            
+            // 模拟networkStatus为undefined的情况
+            const originalNetworkStatus = mockNetworkStatus;
+            mockNetworkStatus = undefined;
+            updateStatus();
+            
+            // 恢复
+            setTimeout(() => {
+                mockNetworkStatus = originalNetworkStatus;
+                updateStatus();
+                console.log('错误场景测试完成');
+            }, 2000);
+        }
+
+        // 添加测试按钮
+        document.addEventListener('DOMContentLoaded', function() {
+            const container = document.querySelector('.test-container');
+            const errorButton = document.createElement('button');
+            errorButton.textContent = '测试错误场景';
+            errorButton.onclick = simulateErrorScenario;
+            errorButton.style.background = '#f44336';
+            container.appendChild(errorButton);
+        });
+    </script>
+</body>
+</html>

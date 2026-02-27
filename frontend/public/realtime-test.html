@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时同步测试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .connected { background-color: #52c41a; }
+        .connecting { background-color: #faad14; }
+        .disconnected { background-color: #ff4d4f; }
+        .message {
+            background: #f0f2f5;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #1890ff;
+        }
+        .input-group {
+            margin: 15px 0;
+        }
+        input, button, select {
+            padding: 10px;
+            margin: 5px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+        }
+        button {
+            background: #1890ff;
+            color: white;
+            cursor: pointer;
+            border: none;
+        }
+        button:hover {
+            background: #40a9ff;
+        }
+        .log {
+            height: 300px;
+            overflow-y: auto;
+            background: #000;
+            color: #00ff00;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            border-radius: 5px;
+        }
+        .room-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .room-tag {
+            background: #e6f7ff;
+            border: 1px solid #91d5ff;
+            padding: 5px 10px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+        }
+        .room-tag button {
+            background: #ff4d4f;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            margin-left: 8px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 实时同步功能测试</h1>
+        
+        <!-- 连接状态 -->
+        <div class="message">
+            <h3>连接状态</h3>
+            <div>
+                <span class="status-indicator disconnected" id="statusIndicator"></span>
+                <span id="statusText">未连接</span>
+            </div>
+            <div>在线用户: <span id="onlineUsers">0</span></div>
+            <div>当前房间: <span id="currentRooms">无</span></div>
+        </div>
+
+        <!-- 认证区域 -->
+        <div class="message">
+            <h3>用户认证</h3>
+            <div class="input-group">
+                <input type="text" id="username" placeholder="用户名" value="testuser">
+                <input type="password" id="password" placeholder="密码" value="testpass123">
+                <button onclick="login()">登录</button>
+                <button onclick="logout()">登出</button>
+            </div>
+            <div>Token: <span id="tokenDisplay">未登录</span></div>
+        </div>
+
+        <!-- 房间管理 -->
+        <div class="message">
+            <h3>房间管理</h3>
+            <div class="input-group">
+                <input type="text" id="roomName" placeholder="房间名称">
+                <button onclick="joinRoom()">加入房间</button>
+                <button onclick="leaveRoom()">离开房间</button>
+            </div>
+            <div class="room-list" id="roomList"></div>
+        </div>
+
+        <!-- 消息发送 -->
+        <div class="message">
+            <h3>发送消息</h3>
+            <div class="input-group">
+                <select id="messageType">
+                    <option value="sync_request">同步请求</option>
+                    <option value="chat_message">聊天消息</option>
+                    <option value="todo_update">待办更新</option>
+                </select>
+                <input type="text" id="messageContent" placeholder="消息内容">
+                <input type="text" id="roomId" placeholder="房间ID (可选)">
+                <button onclick="sendMessage()">发送</button>
+            </div>
+        </div>
+
+        <!-- 日志显示 -->
+        <div class="message">
+            <h3>实时日志</h3>
+            <div class="log" id="logOutput"></div>
+            <button onclick="clearLog()" style="margin-top: 10px;">清空日志</button>
+        </div>
+    </div>
+
+    <script>
+        let socket = null;
+        let token = '';
+        let currentRooms = new Set();
+        let isConnected = false;
+
+        // 更新状态显示
+        function updateStatus(status, message) {
+            const indicator = document.getElementById('statusIndicator');
+            const statusText = document.getElementById('statusText');
+            
+            indicator.className = `status-indicator ${status}`;
+            statusText.textContent = message;
+        }
+
+        // 添加日志
+        function addLog(message, type = 'info') {
+            const logOutput = document.getElementById('logOutput');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${type.toUpperCase()}: ${message}\n`;
+            logOutput.textContent += logEntry;
+            logOutput.scrollTop = logOutput.scrollHeight;
+        }
+
+        // 登录
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if (!username || !password) {
+                addLog('请输入用户名和密码', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:8001/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    token = data.access_token;
+                    document.getElementById('tokenDisplay').textContent = token.substring(0, 20) + '...';
+                    addLog('登录成功', 'success');
+                    
+                    // 自动连接WebSocket
+                    connectWebSocket();
+                } else {
+                    addLog(`登录失败: ${data.detail}`, 'error');
+                }
+            } catch (error) {
+                addLog(`登录错误: ${error.message}`, 'error');
+            }
+        }
+
+        // 登出
+        function logout() {
+            if (socket) {
+                socket.close();
+            }
+            token = '';
+            currentRooms.clear();
+            isConnected = false;
+            document.getElementById('tokenDisplay').textContent = '未登录';
+            updateStatus('disconnected', '未连接');
+            updateRoomList();
+            addLog('已登出', 'info');
+        }
+
+        // 连接WebSocket
+        function connectWebSocket() {
+            if (!token) {
+                addLog('请先登录', 'error');
+                return;
+            }
+
+            const roomsParam = currentRooms.size > 0 ? `&rooms=${Array.from(currentRooms).join(',')}` : '';
+            const wsUrl = `ws://localhost:8001/api/ws/sync?token=${token}${roomsParam}`;
+            
+            updateStatus('connecting', '连接中...');
+            addLog(`正在连接到: ${wsUrl}`);
+
+            socket = new WebSocket(wsUrl);
+
+            socket.onopen = function(event) {
+                isConnected = true;
+                updateStatus('connected', '已连接');
+                addLog('WebSocket连接已建立', 'success');
+            };
+
+            socket.onmessage = function(event) {
+                try {
+                    const message = JSON.parse(event.data);
+                    addLog(`收到消息: ${JSON.stringify(message, null, 2)}`);
+                    
+                    // 处理特定类型的消息
+                    switch (message.type) {
+                        case 'connection_confirmed':
+                            document.getElementById('onlineUsers').textContent = message.online_users || 0;
+                            updateRoomList();
+                            break;
+                        case 'sync_update':
+                            addLog(`同步更新来自用户 ${message.sender_id}`, 'info');
+                            break;
+                        case 'room_joined':
+                            if (message.success) {
+                                currentRooms.add(message.room_id);
+                                updateRoomList();
+                            }
+                            break;
+                        case 'room_left':
+                            if (message.success) {
+                                currentRooms.delete(message.room_id);
+                                updateRoomList();
+                            }
+                            break;
+                    }
+                } catch (error) {
+                    addLog(`解析消息失败: ${error.message}`, 'error');
+                }
+            };
+
+            socket.onclose = function(event) {
+                isConnected = false;
+                updateStatus('disconnected', '连接已断开');
+                addLog(`连接关闭: ${event.code} - ${event.reason}`, 'warning');
+            };
+
+            socket.onerror = function(error) {
+                addLog(`WebSocket错误: ${error.message}`, 'error');
+            };
+        }
+
+        // 发送消息
+        function sendMessage() {
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                addLog('WebSocket未连接', 'error');
+                return;
+            }
+
+            const messageType = document.getElementById('messageType').value;
+            const content = document.getElementById('messageContent').value;
+            const roomId = document.getElementById('roomId').value;
+
+            if (!content) {
+                addLog('请输入消息内容', 'error');
+                return;
+            }
+
+            const message = {
+                type: messageType,
+                data: {
+                    content: content,
+                    timestamp: new Date().toISOString()
+                }
+            };
+
+            if (roomId) {
+                message.room_id = roomId;
+            }
+
+            socket.send(JSON.stringify(message));
+            addLog(`发送消息: ${JSON.stringify(message)}`, 'info');
+            document.getElementById('messageContent').value = '';
+        }
+
+        // 加入房间
+        function joinRoom() {
+            const roomName = document.getElementById('roomName').value;
+            if (!roomName) {
+                addLog('请输入房间名称', 'error');
+                return;
+            }
+
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                addLog('WebSocket未连接', 'error');
+                return;
+            }
+
+            const message = {
+                type: 'join_room',
+                room_id: roomName
+            };
+
+            socket.send(JSON.stringify(message));
+            addLog(`请求加入房间: ${roomName}`);
+        }
+
+        // 离开房间
+        function leaveRoom() {
+            const roomName = document.getElementById('roomName').value;
+            if (!roomName) {
+                addLog('请输入房间名称', 'error');
+                return;
+            }
+
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                addLog('WebSocket未连接', 'error');
+                return;
+            }
+
+            const message = {
+                type: 'leave_room',
+                room_id: roomName
+            };
+
+            socket.send(JSON.stringify(message));
+            addLog(`请求离开房间: ${roomName}`);
+        }
+
+        // 更新房间列表显示
+        function updateRoomList() {
+            const roomList = document.getElementById('roomList');
+            roomList.innerHTML = '';
+            
+            currentRooms.forEach(room => {
+                const roomElement = document.createElement('div');
+                roomElement.className = 'room-tag';
+                roomElement.innerHTML = `
+                    ${room}
+                    <button onclick="leaveSpecificRoom('${room}')">×</button>
+                `;
+                roomList.appendChild(roomElement);
+            });
+            
+            document.getElementById('currentRooms').textContent = 
+                currentRooms.size > 0 ? Array.from(currentRooms).join(', ') : '无';
+        }
+
+        // 离开特定房间
+        function leaveSpecificRoom(roomId) {
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                addLog('WebSocket未连接', 'error');
+                return;
+            }
+
+            const message = {
+                type: 'leave_room',
+                room_id: roomId
+            };
+
+            socket.send(JSON.stringify(message));
+            addLog(`请求离开房间: ${roomId}`);
+        }
+
+        // 清空日志
+        function clearLog() {
+            document.getElementById('logOutput').textContent = '';
+        }
+
+        // 页面加载时的初始化
+        window.onload = function() {
+            addLog('实时同步测试页面已加载');
+            addLog('请先登录以开始测试');
+        };
+    </script>
+</body>
+</html>
